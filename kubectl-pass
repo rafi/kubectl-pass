@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+
+__author='Rafael Bodill <justrafi@gmail.com>'
+__website=https://github.com/rafi/kubectl-pass
+__version=0.1.0
+
+# Help screen
+function _kubepass_help_header() {
+	echo "${__name} v${__version} (${__website})"
+	echo "author: ${__author}"
+	echo
+}
+
+function _kubepass_help_footer() {
+	echo
+	echo "global arguments:"
+	echo "  -h, --help       show help message"
+	echo "  -v, --version    show utility information"
+}
+
+function _kubepass_help() {
+	_kubepass_help_header
+	echo "usage: ${__name} [-hv] <command> <pass-file>"
+	echo
+	echo "commands:"
+	echo "  auth (helper for client authentication)"
+	_kubepass_help_footer
+}
+
+function _kubepass_auth_help() {
+	_kubepass_help_header
+	echo "usage: ${__name} [-hv] auth <pem|token> <pass-file>"
+	echo
+	echo "helper for client authentication, reponds with proper credentials."
+	echo
+	echo "sub-commands:"
+	echo "  pem      - Auth method: PEM"
+	echo "  token    - Auth method: Token"
+	_kubepass_help_footer
+}
+
+# Version display
+function _kubepass_version() {
+	echo "${__name} v${__version} (${__website})"
+}
+
+# Grep and trim a value from text using a key, delimiter is ':'.
+function _kubepass_fetch_key() {
+	echo "$1" | grep "^$2" | cut -d : -f 2 | tr -d '[:space:]' | base64 --decode
+}
+
+function _kubepass_auth() {
+	local positional=() plain=''
+
+	[ "$__trigger_help" = "1" ] && _kubepass_auth_help && exit 0
+
+	while [[ $# -gt 0 ]]; do
+		case "${1}" in
+			-*) echo "Warning, unrecognized option ${1}" >&2; shift ;;
+			*) positional+=("$1"); shift ;;
+		esac
+	done
+	set -- "${positional[@]}"
+
+	if [ -z "${1+set}" ]; then
+		_kubepass_auth_help
+		echo -e "\nERROR: Missing sub-command name, aborting." >&2
+		exit 10
+	elif [ -z "${2+set}" ]; then
+		_kubepass_auth_help
+		echo -e "\nERROR: Missing pass file, aborting." >&2
+		exit 20
+	fi
+
+	plain="$(pass "$2")"
+	if [ "$plain" = "" ]; then
+		echo "Error, unable to read pass file ${2}" >&2
+		exit 30
+	fi
+
+	case "${1}" in
+		pem) echo "$(_kubepass_repond_pem "$plain")";;
+		token) echo "$(_kubepass_repond_token "$plain")";;
+		-*) echo "Warning, unrecognized option ${1}" >&2; shift ;;
+		*) echo "Unknown sub-command for 'auth': ${1}" >&2; exit 40;
+	esac
+}
+
+# Output PEM credentials JSON
+# See: https://kubernetes.io/docs/reference/access-authn-authz/authentication
+function _kubepass_repond_pem() {
+	local plaintext="$1" cert_data='' key_data=''
+
+	cert_data="$(_kubepass_fetch_key "$plaintext" client-certificate-data)"
+	key_data="$(_kubepass_fetch_key "$plaintext" client-key-data)"
+
+	if [ -z "$cert_data" ] || [ -z "$key_data" ]; then
+		echo -e "Missing keys inside pass file!\n"
+		echo "Ensure you have the following keys:"
+		echo "  - client-certificate-data"
+		echo "  - client-key-data"
+		exit 50
+	fi
+
+	jq -n --arg cert "$cert_data" --arg key "$key_data" \
+		'{
+			"apiVersion": "client.authentication.k8s.io/v1beta1",
+			"kind": "ExecCredential",
+			"status": {
+				"clientCertificateData": $cert,
+				"clientKeyData": $key
+			}
+	}'
+}
+
+# Output token credentials JSON
+# See: https://kubernetes.io/docs/reference/access-authn-authz/authentication
+function _kubepass_repond_token() {
+	local plaintext="$1" token='' timestamp=''
+
+	# Token and optional RFC3339 timestamp
+	token="$(_kubepass_fetch_key "$plaintext" token)"
+	timestamp="$(_kubepass_fetch_key "$plaintext" expirationTimestamp)"
+
+	if [ -z "$cert_data" ] || [ -z "$key_data" ]; then
+		echo -e "Missing keys inside pass file!\n"
+		echo "Ensure you have the following keys:"
+		echo "  - token"
+		echo "  - expirationTimestamp"
+		exit 60
+	fi
+
+	jq -n --arg token "$token" --arg timestamp "$timestamp" \
+		'{
+			"apiVersion": "client.authentication.k8s.io/v1beta1",
+			"kind": "ExecCredential",
+			"status": {
+				"token": $token,
+				"expirationTimestamp": $timestamp
+			}
+		}'
+}
+
+# Main procedure
+function _kubepass_main() {
+	local __name='' __positional=() __trigger_help=0 __sub_command=''
+
+	__name="$(basename "$0")"
+
+	while [[ $# -gt 0 ]]; do
+		case "${1}" in
+			-h|--help|help) __trigger_help=1; shift ;;
+			-v|--version|version) _kubepass_version; exit 0 ;;
+			*) __positional+=("$1"); shift ;;
+		esac
+	done
+	set -- "${__positional[@]}"
+
+	# Validate at least one sub-command
+	if [ -z "${1+set}" ]; then
+		_kubepass_help
+		if [ "$__trigger_help" = "0" ]; then
+			echo -e "\nERROR: Missing command name, aborting." >&2
+			exit 1
+		fi
+		exit 0
+	fi
+
+	__sub_command="${1}"
+	shift
+
+	case "${__sub_command}" in
+		auth) _kubepass_auth "$@" ;;
+		-*) echo "Warning, unrecognized option ${__sub_command}" >&2; shift ;;
+		*) echo "Not supported (${__sub_command})" >&2; exit 2;
+	esac
+}
+
+# Start application
+_kubepass_main "$@"
+
+# vim: set ft=sh ts=2 sw=0 tw=80 noet :
