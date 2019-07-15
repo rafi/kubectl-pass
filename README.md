@@ -7,6 +7,7 @@
 
 * [kubectl]
 * [pass]
+* [jq]
 
 ## Subcommands
 
@@ -48,3 +49,4 @@ Now try using `kubectl` with the context you've edited. Enjoy!
 
 [kubectl]: https://kubernetes.io/docs/tasks/tools/install-kubectl/
 [pass]: https://www.passwordstore.org/
+[jq]: https://github.com/stedolan/jq
