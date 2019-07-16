@@ -50,6 +50,15 @@ function _kubepass_fetch_key() {
 	echo "$1" | grep "^$2" | cut -d : -f 2 | tr -d '[:space:]' | base64 --decode
 }
 
+function _kubepass_is_exec() {
+	if ! hash "$1" 2>/dev/null; then
+		echo -en "ERROR: Unable to find '${1}', please install it first" >&2
+		[ -n "${2+set}" ] && echo -en ": ${2}" >&2
+		echo
+		exit 3
+	fi
+}
+
 function _kubepass_auth() {
 	local positional=() plain=''
 
@@ -70,20 +79,20 @@ function _kubepass_auth() {
 	elif [ -z "${2+set}" ]; then
 		_kubepass_auth_help
 		echo -e "\nERROR: Missing pass file, aborting." >&2
-		exit 20
+		exit 11
 	fi
 
 	plain="$(pass "$2")"
 	if [ "$plain" = "" ]; then
 		echo "Error, unable to read pass file ${2}" >&2
-		exit 30
+		exit 12
 	fi
 
 	case "${1}" in
 		pem) echo "$(_kubepass_repond_pem "$plain")";;
 		token) echo "$(_kubepass_repond_token "$plain")";;
 		-*) echo "Warning, unrecognized option ${1}" >&2; shift ;;
-		*) echo "Unknown sub-command for 'auth': ${1}" >&2; exit 40;
+		*) echo "Unknown sub-command for 'auth': ${1}" >&2; exit 13;
 	esac
 }
 
@@ -100,7 +109,7 @@ function _kubepass_repond_pem() {
 		echo "Ensure you have the following keys:"
 		echo "  - client-certificate-data"
 		echo "  - client-key-data"
-		exit 50
+		exit 14
 	fi
 
 	jq -n --arg cert "$cert_data" --arg key "$key_data" \
@@ -128,7 +137,7 @@ function _kubepass_repond_token() {
 		echo "Ensure you have the following keys:"
 		echo "  - token"
 		echo "  - expirationTimestamp"
-		exit 60
+		exit 15
 	fi
 
 	jq -n --arg token "$token" --arg timestamp "$timestamp" \
@@ -156,6 +165,11 @@ function _kubepass_main() {
 		esac
 	done
 	set -- "${__positional[@]}"
+
+	# Verify prerequisites
+	_kubepass_is_exec kubectl https://kubernetes.io/docs/tasks/tools/install-kubectl/
+	_kubepass_is_exec pass https://www.passwordstore.org
+	_kubepass_is_exec jq https://github.com/stedolan/jq
 
 	# Validate at least one sub-command
 	if [ -z "${1+set}" ]; then
