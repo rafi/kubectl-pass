@@ -1,7 +1,24 @@
 # kubectl-pass
 
-> Plugin for `kubectl` that supports various integrations with "[pass]", the
-> standard Unix password manager.
+> Authentication and secret management with [`pass`] and [`kubectl`]
+> integration. Works as a standalone script, or kubectl plugin.
+>
+> `pass`, the standard Unix password manager, is a powerful way to store
+> your valuable secrets with GPG keys.
+> Read about it more at [passwordstore.org].
+
+## Table of Contents
+
+<!-- vim-markdown-toc GFM -->
+
+* [Pre-requisites](#pre-requisites)
+* [Install](#install)
+* [Commands](#commands)
+  * [Auth](#auth)
+* [See Also](#see-also)
+* [License](#license)
+
+<!-- vim-markdown-toc -->
 
 ## Pre-requisites
 
@@ -9,15 +26,37 @@
 * [pass]
 * [jq]
 
-## Subcommands
+## Install
 
-* [auth](#subcommand-auth)
-* More soon...
+Copy `kubectl-pass` somewhere in your `$PATH`:
 
-### Subcommand: Auth
+```bash
+cd ~/.local/bin
+curl -LO https://github.com/rafi/kubectl-pass/raw/master/kubectl-pass
+chmod ug+x kubectl-pass
+```
 
-Allows you to store client data secrets in pass encrypted files. For example,
-if you are using PEM, create a new encrypted pass secret:
+Now you can run as a kubectl plugin, standalone, or alias:
+
+```bash
+kubectl pass -h
+# OR
+kubectl-pass -h
+# OR
+alias kubepass=kubectl-pass
+kubepass -h
+```
+
+## Commands
+
+* [x] kubectl pass [auth](#auth)
+* [ ] kubectl pass [secret](#secret)
+
+### Auth
+
+`kubectl pass auth` reads an encrypted pass file, looks for matching keywords
+and returns a Kubernetes `ExecCredential` kind manifest.
+files. For example, if you are using PEM, create a new encrypted pass secret:
 
 ```bash
 pass edit personal/k8s
@@ -47,6 +86,17 @@ users:
 
 Now try using `kubectl` with the context you've edited. Enjoy!
 
+### Secret
+
+Coming Soon...
+
+## See Also
+
+## License
+
+* MIT
+
 [kubectl]: https://kubernetes.io/docs/tasks/tools/install-kubectl/
-[pass]: https://www.passwordstore.org/
+[pass]: https://www.passwordstore.org
+[passwordstore.org]: https://www.passwordstore.org
 [jq]: https://github.com/stedolan/jq
