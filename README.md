@@ -1,6 +1,6 @@
 # kubectl-pass
 
-> Authentication and secret management with [`pass`] and [`kubectl`]
+> Authentication and secret management with [pass] and [kubectl]
 > integration. Works as a standalone script, or kubectl plugin.
 >
 > `pass`, the standard Unix password manager, is a powerful way to store
@@ -56,7 +56,7 @@ kubepass -h
 
 `kubectl pass auth` reads an encrypted pass file, looks for matching keywords
 and returns a Kubernetes `ExecCredential` kind manifest.
-files. For example, if you are using PEM, create a new encrypted pass secret:
+For example, if you are using PEM, create a new encrypted pass secret:
 
 ```bash
 pass edit personal/k8s
